@@ -27,7 +27,7 @@ struct DHTData
 SoftwareSerial BTserial(11, 10);
 
 // ================================
-// == Function Definition
+// == Function Declaration
 // ================================
 DHTData readDHTData();
 int readLightSensor();
@@ -65,7 +65,7 @@ void loop()
 }
 
 // ================================
-// == Function Declaration
+// == Function Definitions
 // ================================
 
 /**
