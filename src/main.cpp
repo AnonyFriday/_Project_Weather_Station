@@ -6,6 +6,9 @@
 #include <SoftwareSerial.h>
 #include "DHT.h"
 
+// Light Sensor
+#define PIN_LIGHT_SENSOR A3
+
 // DHT11
 #define PIN_DHT11 A4
 DHT dht(PIN_DHT11, DHT11);
@@ -15,18 +18,13 @@ struct DHTData
   float temperature;
 };
 
-// Light Sensor
-#define PIN_LIGHT_SENSOR A3
-int valueLightSensor;
-
 // Rainfall Sensor
 #define PIN_RAINFALL_SENSOR A5
-int valueRainFall;
 
 // Bluetooth HC-05
-#define PIN_TXD 3
-#define PIN_RXD 2
-SoftwareSerial hc05(PIN_RXD, PIN_TXD); // RXD | TXD
+// - HC05 TX - Arduino 11 (RX)
+// - HC05 RX - Arduino 10 (TX)
+SoftwareSerial BTserial(11, 10);
 
 // ================================
 // == Function Definition
@@ -34,6 +32,7 @@ SoftwareSerial hc05(PIN_RXD, PIN_TXD); // RXD | TXD
 DHTData readDHTData();
 int readLightSensor();
 int readRainSensor();
+void writeDataToBluetoothModule(DHTData dhtData, int lightData, int rainData);
 
 // ================================
 // == Main Program
@@ -41,48 +40,26 @@ int readRainSensor();
 void setup()
 {
   Serial.begin(9600);
-
-  // DHT11
   dht.begin();
-
-  // MS-CDS05
   pinMode(PIN_LIGHT_SENSOR, INPUT);
-
-  // HC-05
-  hc05.begin(9600);
-
-  Serial.println(hc05.available());
-
-  Serial.println("--The bluetooth gates are open.\nConnect to HC-05 from any other bluetooth device with 1234 as pairing key!.--\n");
+  BTserial.begin(9600);
 }
 
 void loop()
 {
-  // =============
-  // Read DHT data
-  // =============
-  // DHTData valueDht = readDHTData();
+  int valueLightSensor = readLightSensor();
+  DHTData valueDht = readDHTData();
+  int valueRainFall = readRainSensor();
+  writeDataToBluetoothModule(valueDht, valueLightSensor, valueRainFall);
 
-  // =============
-  // Read Light Sensor data
-  // =============
-  // valueLightSensor = readLightSensor();
-
-  // =============
-  // Rainfall Sensor Data
-  // =============
-  // valueRainFall = readRainSensor();
-
-  // =============
-  // Bluetooth Module
-  // =============
-  // if (hc05.available())
-  // {
-  //   // Feed data from bluetooth to terminal
-  //   Serial.write(valueLightSensor);
-
-  //   // Feed data from terminal to bluetooth
-  // }
+  // BTserial.print((int)valueLightSensor);
+  // BTserial.print(",");
+  // BTserial.print(valueDht.humidity);
+  // BTserial.print(",");
+  // BTserial.print(valueDht.temperature);
+  // BTserial.print(",");
+  // BTserial.print("No Rain");
+  // BTserial.print(";");
 
   delay(2000);
 }
@@ -100,21 +77,6 @@ DHTData readDHTData()
   DHTData dhtData;
   dhtData.humidity = dht.readHumidity();
   dhtData.temperature = dht.readTemperature();
-
-  // Checking if the value is nan or not
-  if (isnan(dhtData.humidity) || isnan(dhtData.temperature))
-  {
-    Serial.println("Cannot read humidity or temperature from DHT11");
-  }
-  else
-  {
-    Serial.print("Humidity: ");
-    Serial.print(dhtData.humidity);
-    Serial.print(" %, Temperature: ");
-    Serial.print(dhtData.temperature);
-    Serial.println(" °C");
-  }
-
   return dhtData;
 }
 
@@ -123,17 +85,6 @@ DHTData readDHTData()
  */
 int readLightSensor()
 {
-  // Checking if the value is nan or not
-  if (isnan(valueLightSensor))
-  {
-    Serial.println("Cannot read Light Sensor");
-  }
-  else
-  {
-    Serial.print("Light Value Sensor: ");
-    Serial.println(valueLightSensor);
-  }
-
   return analogRead(PIN_LIGHT_SENSOR);
 }
 
@@ -145,33 +96,97 @@ int readRainSensor()
   int sensorMin = 0;
   int sensorMax = 1024;
   int sensorReading = analogRead(PIN_RAINFALL_SENSOR);
+  return sensorReading;
+}
 
-  int range = map(sensorReading, sensorMin, sensorMax, 0, 3);
-
+void writeDataToBluetoothModule(DHTData dhtData, int lightData, int rainData)
+{
+  // =============
+  // Read Light Sensor data
+  // =============
+  Serial.println("-------------------------------------------");
   // Checking if the value is nan or not
-  if (isnan(valueRainFall))
+  Serial.print("lightData: ");
+  Serial.println(lightData);
+  int lightThresholdLower = 500;
+  int lightThresholdUpper = 850;
+  if (isnan(lightData))
   {
-    Serial.println("Cannot read Rainfall Sensor");
+    Serial.println("---Cannot read Light Sensor");
   }
   else
   {
-    Serial.println("Rain Fall sensor");
-    Serial.println(sensorReading);
-    switch (valueRainFall)
+    // Bluetooth printing
+    BTserial.print(lightData);
+    BTserial.print(",");
+
+    if (lightData <= lightThresholdLower)
     {
-    case 0:
-      Serial.println("Rain Warning");
-      break;
-    case 1:
-      Serial.println("Not Raining");
-      break;
-    case 2:
-      Serial.println("Light Rain");
-      break;
-    case 3:
-      Serial.println("Moderate to Heavy Rain");
-      break;
+      BTserial.print("Too bright,");
+    }
+    else if (lightData >= lightThresholdUpper)
+    {
+      BTserial.print("Too dark,");
+    }
+    else
+    {
+      BTserial.print("Normal Light,");
     }
   }
-  return range;
+
+  // =============
+  // Read DHT data
+  // =============
+  // Checking if the value is nan or not
+  if (isnan(dhtData.humidity) || isnan(dhtData.temperature))
+  {
+    Serial.println("---Cannot read humidity or temperature from DHT11");
+  }
+  else
+  {
+    // Serial Printing
+    Serial.print("Humidity: ");
+    Serial.print(dhtData.humidity);
+    Serial.print(" %, Temperature: ");
+    Serial.print(dhtData.temperature);
+    Serial.println("°C");
+
+    // Bluetooth printing
+    BTserial.print(dhtData.humidity);
+    BTserial.print("%,");
+    BTserial.print(dhtData.temperature);
+    BTserial.print("*C,");
+  }
+
+  // =============
+  // Rainfall Sensor Data
+  // =============
+  // Checking if the value is nan or not
+  Serial.print("rainData: ");
+  Serial.println(rainData);
+  int rainThreshold = 800;
+  if (isnan(rainData))
+  {
+    Serial.println("---Cannot read Rainfall Sensor");
+  }
+  else
+  {
+    BTserial.print(rainData);
+    BTserial.print(",");
+    if (rainData <= rainThreshold)
+    {
+      // Bluetooth printing
+
+      BTserial.print("Is Raining;");
+      Serial.println("Is Raining");
+    }
+    else
+    {
+      // Bluetooth printing
+      BTserial.print("No Rain;");
+      Serial.println("No Rain");
+    }
+
+    Serial.println("-------------------------------------------");
+  }
 }
