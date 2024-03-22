@@ -93,8 +93,6 @@ int readLightSensor()
  */
 int readRainSensor()
 {
-  int sensorMin = 0;
-  int sensorMax = 1024;
   int sensorReading = analogRead(PIN_RAINFALL_SENSOR);
   return sensorReading;
 }
@@ -109,7 +107,7 @@ void writeDataToBluetoothModule(DHTData dhtData, int lightData, int rainData)
   Serial.print("lightData: ");
   Serial.println(lightData);
   int lightThresholdLower = 500;
-  int lightThresholdUpper = 850;
+  int lightThresholdUpper = 950;
   if (isnan(lightData))
   {
     Serial.println("---Cannot read Light Sensor");
